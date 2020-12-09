@@ -950,6 +950,42 @@ class DeckShareProvider implements \OCP\Share\IShareProvider {
 	}
 
 	/**
+	 * For each user the path with the fewest slashes is returned
+	 * @param array $shares
+	 * @return array
+	 */
+	protected function filterSharesOfUser(array $shares): array {
+		// Deck shares when the user has a share exception
+		foreach ($shares as $id => $share) {
+			$type = (int) $share['share_type'];
+			$permissions = (int) $share['permissions'];
+
+			if ($type === self::SHARE_TYPE_DECK_USER) {
+				unset($shares[$share['parent']]);
+
+				if ($permissions === 0) {
+					unset($shares[$id]);
+				}
+			}
+		}
+
+		$best = [];
+		$bestDepth = 0;
+		foreach ($shares as $id => $share) {
+			$depth = substr_count($share['file_target'], '/');
+			if (empty($best) || $depth < $bestDepth) {
+				$bestDepth = $depth;
+				$best = [
+					'node_id' => $share['file_source'],
+					'node_path' => $share['file_target'],
+				];
+			}
+		}
+
+		return $best;
+	}
+
+	/**
 	 * Get all children of this share
 	 *
 	 * Not part of IShareProvider API, but needed by OC\Share20\Manager.

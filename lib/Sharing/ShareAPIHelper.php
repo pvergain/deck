@@ -50,4 +50,63 @@ class ShareAPIHelper {
 		$result['share_with_link'] = $this->urlGenerator->linkToRouteAbsolute('deck.page.index') . '#/board/' . $boardId . '/card/' . $card->getId();
 		return $result;
 	}
+
+	public function createShare(IShare $share, string $shareWith, int $permissions, $expireDate) {
+		$share->setSharedWith($shareWith);
+		$share->setPermissions($permissions);
+
+		if ($expireDate !== '') {
+			try {
+				$expireDate = $this->parseDate($expireDate);
+				$share->setExpirationDate($expireDate);
+			} catch (\Exception $e) {
+				throw new OCSNotFoundException($this->l->t('Invalid date, date format must be YYYY-MM-DD'));
+			}
+		}
+	}
+
+	/**
+	 * Make sure that the passed date is valid ISO 8601
+	 * So YYYY-MM-DD
+	 * If not throw an exception
+	 *
+	 * Copied from \OCA\Files_Sharing\Controller\ShareAPIController::parseDate.
+	 *
+	 * @param string $expireDate
+	 * @return \DateTime
+	 * @throws \Exception
+	 */
+	private function parseDate(string $expireDate): \DateTime {
+		try {
+			$date = $this->timeFactory->getDateTime($expireDate);
+		} catch (\Exception $e) {
+			throw new \Exception('Invalid date. Format must be YYYY-MM-DD');
+		}
+
+		if ($date === false) {
+			throw new \Exception('Invalid date. Format must be YYYY-MM-DD');
+		}
+
+		$date->setTime(0, 0, 0);
+
+		return $date;
+	}
+
+	/**
+	 * Returns whether the given user can access the given room share or not.
+	 *
+	 * A user can access a room share only if she is a participant of the room.
+	 *
+	 * @param IShare $share
+	 * @param string $user
+	 * @return bool
+	 */
+	public function canAccessShare(IShare $share, string $user): bool {
+		try {
+			$this->permissionService->checkPermission($this->cardMapper, $share->getSharedWith(), Acl::PERMISSION_READ, $user);
+		} catch (NoPermissionException $e) {
+			return false;
+		}
+		return true;
+	}
 }
